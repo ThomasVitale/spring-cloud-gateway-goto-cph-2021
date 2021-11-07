@@ -15,3 +15,13 @@ spring:
       probability: 1.0
   zipkin:
     base-url: ${ZIPKIN_URL:http://localhost:9411}
+  cloud:
+    gateway:
+      routes:
+        - id: book-route
+          uri: ${BOOK_SERVICE_URL:http://localhost:9001}
+          predicates:
+            - Path=/books/**
+          filters:
+            - AddRequestHeader=X-Tenant,acme
+            - AddResponseHeader=X-Genre,fantasy
