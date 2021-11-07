@@ -1,0 +1,112 @@
+version: "3.8"
+services:
+
+  redis:
+    image: redis:6.2
+    container_name: redis
+    ports:
+      - 6379:6379
+
+  keycloak:
+    image: thomasvitale/keycloak-m1:15.0.1 # Use jboss/keycloak:15.0.1 on Intel processors
+    container_name: "keycloak"
+    volumes:
+      - ./platform/keycloak:/opt/jboss/keycloak/imports
+    environment:
+      KEYCLOAK_USER: user
+      KEYCLOAK_PASSWORD: password
+      KEYCLOAK_IMPORT: /opt/jboss/keycloak/imports/realm-export.json
+    ports:
+      - 8080:8080
+
+  # Observability
+
+  grafana:
+    image: grafana/grafana:8.2.3
+    container_name: grafana
+    depends_on:
+      - loki
+      - prometheus
+      - tempo
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: user
+      GF_SECURITY_ADMIN_PASSWORD: password
+    volumes:
+      - ./platform/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./platform/grafana/dashboards:/etc/grafana/provisioning/dashboards
+
+  prometheus:
+    image: prom/prometheus:v2.30.3
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - "./platform/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
+
+  loki:
+    image: grafana/loki:2.4.0
+    container_name: loki
+    depends_on:
+      - fluent-bit
+    ports:
+      - "3100:3100"
+
+  fluent-bit:
+    image: grafana/fluent-bit-plugin-loki:2.4.0-amd64
+    container_name: fluent-bit
+    ports:
+      - "24224:24224"
+    environment:
+      - LOKI_URL=http://loki:3100/loki/api/v1/push
+    volumes:
+      - ./platform/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+
+  tempo:
+    image: grafana/tempo:1.2.0
+    container_name: tempo
+    command: -config.file /etc/tempo-config.yml
+    volumes:
+      - ./platform/tempo/tempo.yml:/etc/tempo-config.yml
+    ports:
+      - "3101:3100"     # Tempo
+      - "9411:9411"     # Zipkin
+
+  # Applications
+
+  book-service:
+    image: book-service:0.0.1-SNAPSHOT
+    container_name: book-service
+    depends_on:
+      - fluent-bit
+      - keycloak
+    ports:
+      - 9001:9001
+    environment:
+      - BPL_JVM_THREAD_COUNT=50
+      - KEYCLOAK_URL=http://host.docker.internal:8080
+      - ZIPKIN_URL=http://tempo:9411
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+
+  edge-service:
+    image: edge-service:0.0.1-SNAPSHOT
+    container_name: edge-service
+    depends_on:
+      - fluent-bit
+      - keycloak
+    ports:
+      - 9000:9000
+    environment:
+      - BPL_JVM_THREAD_COUNT=25
+      - BOOK_SERVICE_URL=http://book-service:9001
+      - KEYCLOAK_URL=http://host.docker.internal:8080
+      - SPRING_REDIS_HOST=redis
+      - ZIPKIN_URL=http://tempo:9411
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224

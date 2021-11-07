@@ -1,0 +1,75 @@
+server:
+  port: 9000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+spring:
+  application:
+    name: edge-service
+  sleuth:
+    sampler:
+      probability: 1.0
+  zipkin:
+    base-url: ${ZIPKIN_URL:http://localhost:9411}
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: edge-service
+            client-secret: polar-keycloak-secret
+            scope: openid
+        provider:
+          keycloak:
+            issuer-uri: ${KEYCLOAK_URL:http://localhost:8080}/auth/realms/PolarBookshop
+  session:
+    store-type: redis
+  redis:
+    host: localhost
+    port: 6379
+  cloud:
+    gateway:
+      default-filters:
+        - TokenRelay
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 10
+            redis-rate-limiter.burstCapacity: 20
+            redis-rate-limiter.requestedTokens: 1
+      routes:
+        - id: book-route
+          uri: ${BOOK_SERVICE_URL:http://localhost:9001}
+          predicates:
+            - Path=/books/**
+          filters:
+            - AddRequestHeader=X-Tenant,acme
+            - AddResponseHeader=X-Genre,fantasy
+            - name: CircuitBreaker
+              args:
+                name: bookService
+                fallbackUri: forward:/book-fallback
+            - name: Retry
+              args:
+                retries: 3
+                method: GET
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      bookService:
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 15000
+        registerHealthIndicator: true
+  timelimiter:
+    instances:
+      bookService:
+        timeoutDuration: 2s

@@ -1,0 +1,22 @@
+server:
+  port: 9001
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+spring:
+  application:
+    name: book-service
+  sleuth:
+    sampler:
+      probability: 1.0
+  zipkin:
+    base-url: ${ZIPKIN_URL:http://localhost:9411}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_URL:http://localhost:8080}/auth/realms/PolarBookshop
