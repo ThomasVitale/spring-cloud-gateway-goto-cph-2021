@@ -104,6 +104,7 @@ services:
       - BPL_JVM_THREAD_COUNT=25
       - BOOK_SERVICE_URL=http://book-service:9001
       - KEYCLOAK_URL=http://host.docker.internal:8080
+      - RESILIENCE4J_TIMELIMITER_INSTANCES_BOOKSERVICE_TIMEOUTDURATION=5s
       - SPRING_REDIS_HOST=redis
       - ZIPKIN_URL=http://tempo:9411
     logging:

@@ -12,6 +12,8 @@ entry point of your system, it’s also an excellent candidate to implement secu
 I'll show you how to do that with Spring Security, OAuth2 and OpenID Connect, relying on Spring Redis Reactive
 to manage sessions.
 
+[Conference Session](https://gotocph.com/2021/sessions/1956/spring-cloud-gateway-resilience-and-security)
+
 ## Usage
 
 You can use Docker Compose to set up the entire system, including applications, data services, and the Grafana observability stack.
